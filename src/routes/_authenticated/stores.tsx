@@ -71,6 +71,8 @@ function PageBoutiques() {
         </section>
       )}
 
+      {/* Pas de storeId ici : cet écran liste les boutiques elles-mêmes, et
+          la RLS ne renvoie déjà que celles auxquelles l'utilisateur a accès. */}
       <ResourceTable
         resource={storesResource}
         columns={colonnes}

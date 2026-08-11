@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useAuth } from '#/shared/providers/auth-provider'
+import { useStoreContext } from '#/shared/providers/store-provider'
 import { Button } from '#/shared/components/ui/button'
 
 export const Route = createFileRoute('/_authenticated/dashboard')({
@@ -8,6 +9,7 @@ export const Route = createFileRoute('/_authenticated/dashboard')({
 
 function Dashboard() {
   const { session, can, logout } = useAuth()
+  const { activeStore } = useStoreContext()
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-8">
@@ -19,7 +21,15 @@ function Dashboard() {
       </header>
 
       <section className="space-y-2">
-        <h2 className="font-medium">Permissions effectives</h2>
+        <h2 className="font-medium">
+          Permissions effectives
+          {activeStore && (
+            <span className="text-muted-foreground font-normal">
+              {' '}
+              — {activeStore.nom}
+            </span>
+          )}
+        </h2>
         {session?.allPermissions ? (
           <p className="text-sm">
             Propriétaire : toutes les permissions, sur toutes les boutiques.

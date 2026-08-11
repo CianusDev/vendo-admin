@@ -18,3 +18,12 @@ export const relayCookieHeaders = createServerOnlyFn(
     return cookie ? { cookie } : {}
   },
 )
+
+/** Boutique active pendant un rendu serveur, lue dans la requête entrante. */
+export const readActiveStoreOnServer = createServerOnlyFn(
+  async (): Promise<string | undefined> => {
+    const { getCookie } = await import('@tanstack/react-start/server')
+    const { ACTIVE_STORE_COOKIE } = await import('./active-store')
+    return getCookie(ACTIVE_STORE_COOKIE) ?? undefined
+  },
+)

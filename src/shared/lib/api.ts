@@ -1,13 +1,17 @@
 import { environment } from '#/environments'
+import { lireBoutiqueActiveClient } from './active-store'
 import { ApiError, problemInattendu } from './problem'
 import type { ProblemDetails } from './problem'
-import { relayCookieHeaders } from './relay-cookie'
+import { readActiveStoreOnServer, relayCookieHeaders } from './relay-cookie'
 
 type Params = Record<string, string | number | boolean | null | undefined>
 
 export interface ApiOptions extends Omit<RequestInit, 'body' | 'method'> {
   params?: Params
-  /** Boutique visée, envoyée en `X-Store-Id`. */
+  /**
+   * Boutique visée. À défaut, la boutique active est employée : les écrans
+   * courants n'ont pas à la répéter à chaque appel.
+   */
   storeId?: string
   /** Interdit la tentative de renouvellement, pour éviter toute boucle. */
   skipRefresh?: boolean
@@ -113,7 +117,7 @@ export class Api {
     const enTetes: Record<string, string> = {
       Accept: 'application/json',
       ...(data !== undefined ? { 'Content-Type': 'application/json' } : {}),
-      ...(storeId ? { 'X-Store-Id': storeId } : {}),
+      ...(await this.enTeteBoutique(storeId)),
       ...(await this.enTetesDeRelai()),
       ...((headers as Record<string, string> | undefined) ?? {}),
     }
@@ -186,6 +190,23 @@ export class Api {
     } catch {
       return problemInattendu(reponse.status, reponse.statusText)
     }
+  }
+
+  /**
+   * `X-Store-Id` de la requête. La valeur explicite l'emporte ; sinon on prend
+   * la boutique active, lue dans le cookie côté navigateur comme côté serveur.
+   */
+  private async enTeteBoutique(
+    explicite?: string,
+  ): Promise<Record<string, string>> {
+    if (explicite) return { 'X-Store-Id': explicite }
+
+    const active =
+      typeof window === 'undefined'
+        ? await readActiveStoreOnServer()
+        : lireBoutiqueActiveClient()
+
+    return active ? { 'X-Store-Id': active } : {}
   }
 
   private async enTetesDeRelai(): Promise<Record<string, string>> {

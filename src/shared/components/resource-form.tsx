@@ -95,6 +95,17 @@ export function ResourceForm<T extends FieldValues>({
     defaultValues,
   })
 
+  /**
+   * `setValue` est typé par champ, ce qu'on ne peut pas exprimer ici : le nom
+   * du champ n'est connu qu'à l'exécution. Un seul assouplissement, à cet
+   * endroit, plutôt qu'une assertion à chaque appel.
+   */
+  const definirValeur = setValue as (
+    name: Path<T>,
+    value: unknown,
+    options?: { shouldValidate?: boolean },
+  ) => void
+
   const soumettre = async (valeurs: T) => {
     try {
       await onSubmit(valeurs)
@@ -132,11 +143,7 @@ export function ResourceForm<T extends FieldValues>({
                 disabled={champ.disabled}
                 value={(watch(champ.name) as string | undefined) ?? ''}
                 onValueChange={(valeur) =>
-                  // Le champ est générique : sa valeur ne peut pas être
-                  // reliée statiquement à `Path<T>` depuis ici.
-                  setValue(champ.name, valeur as never, {
-                    shouldValidate: true,
-                  })
+                  definirValeur(champ.name, valeur, { shouldValidate: true })
                 }
               >
                 <SelectTrigger aria-invalid={!!message}>
