@@ -2,7 +2,6 @@ import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 
 import appCss from '../styles.css?url'
 import { environment } from '#/environments'
-import { AuthProvider } from '#/shared/providers/auth-provider'
 import { Toaster } from 'sonner'
 
 export const Route = createRootRoute({
@@ -36,7 +35,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        {children}
         <Toaster className="font-sans" />
         <Scripts />
       </body>

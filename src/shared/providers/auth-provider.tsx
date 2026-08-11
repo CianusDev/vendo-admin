@@ -1,71 +1,68 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useState,
-} from 'react'
+import { createContext, useCallback, useContext, useMemo } from 'react'
+import { useRouter } from '@tanstack/react-router'
+import { signOut } from '#/features/auth/auth.service'
+import type { Session } from '#/features/auth/auth.types'
 
-import api from '#/shared/lib/api'
-import storage from '#/shared/lib/local-storage'
-import { LOCAL_STORAGE_KEYS } from '#/shared/data/local-storage-keys'
-
-export type AuthUser = {
-  id: string
-  email: string
-  [key: string]: unknown
-}
-
-type AuthState = {
-  user: AuthUser | null
-  token: string | null
+interface AuthContextValue {
+  session: Session | null
   isAuthenticated: boolean
-}
-
-type AuthContextValue = AuthState & {
-  login: (token: string, user: AuthUser) => void
-  logout: () => void
+  /** Vrai si la permission est détenue sur la boutique active. */
+  can: (permission: string) => boolean
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>(() => {
-    const token = storage.get<string>(LOCAL_STORAGE_KEYS.AUTH_TOKEN)
-    const user = storage.get<AuthUser>(LOCAL_STORAGE_KEYS.USER)
-    return { token, user, isAuthenticated: !!token }
-  })
+/**
+ * Expose la session chargée par la route, sans la stocker.
+ *
+ * Rien n'est conservé côté client : la session vit dans un cookie httpOnly, et
+ * son état fait autorité côté serveur. Le fournisseur ne fait que distribuer
+ * ce que le `beforeLoad` de la route a déjà obtenu — la version précédente
+ * gardait un jeton en `localStorage`, ce que §8 du cahier interdit.
+ */
+export function AuthProvider({
+  session,
+  children,
+}: {
+  session: Session | null
+  children: React.ReactNode
+}) {
+  const router = useRouter()
 
-  const logout = useCallback(() => {
-    storage.remove(LOCAL_STORAGE_KEYS.AUTH_TOKEN)
-    storage.remove(LOCAL_STORAGE_KEYS.USER)
-    api.setAuthToken(null)
-    setState({ token: null, user: null, isAuthenticated: false })
-  }, [])
-
-  const login = useCallback((token: string, user: AuthUser) => {
-    storage.set(LOCAL_STORAGE_KEYS.AUTH_TOKEN, token)
-    storage.set(LOCAL_STORAGE_KEYS.USER, user)
-    api.setAuthToken(token)
-    setState({ token, user, isAuthenticated: true })
-  }, [])
-
-  // useEffect(() => {
-  //   if (state.token) api.setAuthToken(state.token)
-  //   api.setUnauthorizedHandler(() => {
-  //     logout()
-  //     window.location.href = '/login'
-  //   })
-  // }, [state.token, logout])
-
-  return (
-    <AuthContext.Provider value={{ ...state, login, logout }}>
-      {children}
-    </AuthContext.Provider>
+  const can = useCallback(
+    (permission: string) => {
+      if (!session) return false
+      return session.allPermissions || session.permissions.includes(permission)
+    },
+    [session],
   )
+
+  const logout = useCallback(async () => {
+    await signOut()
+    // Invalide les données chargées : sans cela, les écrans gardent en mémoire
+    // ce que l'utilisateur venait de voir.
+    await router.invalidate()
+    await router.navigate({ to: '/login' })
+  }, [router])
+
+  const valeur = useMemo<AuthContextValue>(
+    () => ({
+      session,
+      isAuthenticated: session !== null,
+      can,
+      logout,
+    }),
+    [session, can, logout],
+  )
+
+  return <AuthContext.Provider value={valeur}>{children}</AuthContext.Provider>
 }
 
 export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used within <AuthProvider>')
-  return ctx
+  const contexte = useContext(AuthContext)
+  if (!contexte) {
+    throw new Error('useAuth doit être utilisé dans <AuthProvider>')
+  }
+  return contexte
 }
